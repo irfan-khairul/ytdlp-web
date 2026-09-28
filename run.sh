@@ -77,13 +77,15 @@ listen_pids() {
   fi
 }
 
-# "address interface" for each IPv4 address of this machine, loopback excluded.
+# "address interface" for each IPv4 address other devices could use. Skips
+# loopback and container/VM networks (Docker, libvirt, LXC, Podman), which
+# only work from inside this machine.
 local_ips() {
   if command -v ip >/dev/null; then
     ip -4 -o addr show | awk '{split($4, a, "/"); print a[1], $2}'
   else
     ifconfig | awk '/^[a-z]/ {iface = $1; sub(":", "", iface)} /inet / {print $2, iface}'
-  fi | grep -v '^127\.'
+  fi | grep -v '^127\.' | grep -vE ' (docker[0-9]*|br-[0-9a-f]+|veth[^ ]*|virbr[0-9]*|lxcbr[0-9]*|lxdbr[0-9]*|podman[0-9]*|cni[^ ]*|flannel[^ ]*)$' || true
 }
 
 print_urls() {
