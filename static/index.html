@@ -61,6 +61,44 @@
   .meta { color: var(--muted); font-size: 13px; }
   .msg { margin-top: 10px; font-size: 14px; color: var(--err); }
   .msg:empty { display: none; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .chips:empty { display: none; }
+  .chip { font-size: 12px; line-height: 1.4; padding: 2px 8px; border-radius: 999px; background: var(--bar); color: var(--text); }
+
+  /* Advanced options */
+  details.adv { margin-top: 12px; border-top: 1px solid var(--border); }
+  details.adv > summary {
+    list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px;
+    min-height: 44px; padding-top: 8px; font-weight: 600; font-size: 15px;
+  }
+  details.adv > summary::-webkit-details-marker { display: none; }
+  .chev { display: inline-block; transition: transform .15s; color: var(--muted); }
+  details[open] > summary .chev { transform: rotate(90deg); }
+  .badge { background: var(--accent); color: var(--accent-text); border-radius: 999px; font-size: 12px; padding: 0 8px; }
+  .badge[hidden] { display: none; }
+  .adv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 8px 0 4px; }
+  .adv-grid .full { grid-column: 1 / -1; }
+  fieldset { border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px 12px; margin: 0; min-width: 0; }
+  fieldset:disabled { opacity: .45; }
+  legend { font-size: 13px; font-weight: 600; color: var(--muted); padding: 0 4px; }
+  .check { display: flex; align-items: center; gap: 10px; min-height: 36px; font-size: 15px; cursor: pointer; }
+  .check input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); flex: none; }
+  .check:has(input:disabled) { opacity: .5; cursor: default; }
+  .field { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; font-size: 13px; color: var(--muted); }
+  .field input, .field select {
+    width: 100%; min-height: 40px; padding: 8px 10px; font: inherit; font-size: 16px; color: var(--text);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  }
+  .field input:disabled, .field select:disabled { opacity: .5; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .hint:empty { display: none; }
+  .cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0 12px; margin-top: 6px; }
+  .cats .check { font-size: 14px; min-height: 32px; }
+  .cats .check input { width: 18px; height: 18px; }
+  .linkish { background: none; border: 0; padding: 0; min-height: 0; margin-top: 8px; font-size: 13px; font-weight: 500; color: var(--muted); text-decoration: underline; }
+
+  /* Jobs */
   .jobs { display: flex; flex-direction: column; gap: 10px; }
   .job { display: flex; gap: 12px; align-items: flex-start; }
   .job .body { flex: 1; min-width: 0; }
@@ -71,6 +109,13 @@
   .actions { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
   .actions a { text-decoration: none; }
   .error { color: var(--err); font-size: 13px; word-break: break-word; }
+  .warn { color: var(--muted); font-size: 12px; margin-top: 4px; word-break: break-word; }
+  .files { margin-top: 6px; }
+  .files > summary { cursor: pointer; font-size: 13px; color: var(--muted); min-height: 32px; display: flex; align-items: center; }
+  .files ul { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+  .files li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+  .files a { color: var(--text); word-break: break-word; }
+  .files .size { color: var(--muted); flex: none; }
   .empty { color: var(--muted); font-size: 14px; }
   @media (max-width: 560px) {
     h1 { font-size: 20px; margin-bottom: 14px; }
@@ -79,6 +124,7 @@
     .controls { flex: 1 1 100%; }
     .controls select { flex: 1; min-width: 0; }
     .controls button { flex: 1; }
+    .adv-grid { grid-template-columns: 1fr; }
     .job img, .preview img { width: 96px; }
     .job .title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .actions { gap: 8px; }
@@ -95,7 +141,7 @@
     <form id="form">
       <div class="url-row">
         <input id="url" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
-               enterkeyhint="go" placeholder="Paste a video URL" required>
+               enterkeyhint="go" placeholder="Paste a video or playlist URL" required>
         <button type="button" id="paste" hidden>Paste</button>
       </div>
       <div class="controls">
@@ -105,12 +151,89 @@
     </form>
     <div class="preview" id="preview">
       <img id="pv-thumb" alt="">
-      <div>
+      <div style="min-width:0">
         <div id="pv-title" style="font-weight:600"></div>
         <div class="meta" id="pv-meta"></div>
+        <div class="chips" id="pv-chips"></div>
       </div>
     </div>
     <div class="msg" id="msg"></div>
+
+    <details class="adv" id="adv">
+      <summary><span class="chev">›</span> Advanced options <span class="badge" id="adv-count" hidden></span></summary>
+      <div class="adv-grid">
+        <fieldset>
+          <legend>Playlist</legend>
+          <label class="check"><input type="checkbox" id="o-playlist"> Download whole playlist</label>
+          <label class="field">Only these items
+            <input id="o-items" placeholder="e.g. 1-5,8 (blank = all)" autocomplete="off">
+          </label>
+          <div class="hint" id="pl-hint"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Clip</legend>
+          <div class="row2">
+            <label class="field">Start <input id="o-start" placeholder="0:30" autocomplete="off"></label>
+            <label class="field">End <input id="o-end" placeholder="1:45" autocomplete="off"></label>
+          </div>
+          <label class="check"><input type="checkbox" id="o-precise"> Precise cut (slower)</label>
+          <div class="hint">Without precise cut, the clip snaps to the nearest keyframe and may run a few seconds long. Subtitles, chapters and SponsorBlock are off for clips.</div>
+        </fieldset>
+
+        <fieldset id="fs-subs">
+          <legend>Subtitles</legend>
+          <label class="check"><input type="checkbox" id="o-subs"> Download subtitles</label>
+          <label class="field">Languages
+            <input id="o-langs" value="en.*" placeholder="en.*,ms" autocomplete="off" autocapitalize="off" spellcheck="false">
+          </label>
+          <label class="check"><input type="checkbox" id="o-auto"> Include auto-generated</label>
+          <label class="field">Save as
+            <select id="o-submode">
+              <option value="embed">Embedded in the video</option>
+              <option value="file">Separate .srt file</option>
+            </select>
+          </label>
+          <div class="hint" id="subs-hint"></div>
+        </fieldset>
+
+        <fieldset id="fs-chapters">
+          <legend>Chapters</legend>
+          <label class="check"><input type="checkbox" id="o-embedch" checked> Embed chapters</label>
+          <label class="check"><input type="checkbox" id="o-split"> One file per chapter</label>
+          <div class="hint" id="ch-hint"></div>
+        </fieldset>
+
+        <fieldset id="fs-sb" class="full">
+          <legend>SponsorBlock</legend>
+          <label class="field">Sponsor and filler segments
+            <select id="o-sb">
+              <option value="off">Leave as is</option>
+              <option value="mark">Mark them as chapters</option>
+              <option value="remove">Cut them out</option>
+            </select>
+          </label>
+          <div class="cats" id="o-cats"></div>
+        </fieldset>
+
+        <fieldset class="full">
+          <legend>Other</legend>
+          <label class="check"><input type="checkbox" id="o-thumb" checked> Embed thumbnail as cover art</label>
+          <div class="row2">
+            <label class="field">Container
+              <select id="o-container">
+                <option value="mp4">MP4 (plays everywhere)</option>
+                <option value="mkv">MKV (best for subs)</option>
+              </select>
+            </label>
+            <label class="field">Speed limit
+              <input id="o-rate" placeholder="e.g. 5M" autocomplete="off" autocapitalize="off">
+            </label>
+          </div>
+          <button type="button" class="linkish" id="adv-reset">Reset to defaults</button>
+        </fieldset>
+      </div>
+    </details>
   </div>
 
   <h2>Downloads</h2>
@@ -122,6 +245,8 @@ const $ = (id) => document.getElementById(id);
 let preview = null;       // info for the URL currently in the box
 let previewFor = "";
 let pollTimer = null;
+let presets = [];
+const openFileLists = new Set();
 
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -151,17 +276,112 @@ function fmtTime(s) {
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
+function store(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
+function load(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }
+function showMsg(text, isError = true) {
+  $("msg").style.color = isError ? "var(--err)" : "var(--muted)";
+  $("msg").textContent = text;
+}
+
+// ---- Advanced options ------------------------------------------------------
+
+const ADV_DEFAULTS = {
+  playlist: false, playlist_items: "", start: "", end: "", precise_cut: false,
+  subs: false, sub_langs: "en.*", auto_subs: false, sub_mode: "embed",
+  embed_chapters: true, split_chapters: false,
+  sponsorblock: "off", sponsor_categories: ["sponsor"],
+  embed_thumbnail: true, container: "mp4", rate_limit: "",
+};
+const FIELDS = {
+  playlist: "o-playlist", playlist_items: "o-items", start: "o-start", end: "o-end", precise_cut: "o-precise",
+  subs: "o-subs", sub_langs: "o-langs", auto_subs: "o-auto", sub_mode: "o-submode",
+  embed_chapters: "o-embedch", split_chapters: "o-split", sponsorblock: "o-sb",
+  embed_thumbnail: "o-thumb", container: "o-container", rate_limit: "o-rate",
+};
+// These depend on the particular link, so they aren't remembered between visits.
+const PER_URL = ["playlist", "playlist_items", "start", "end", "precise_cut"];
+
+function readAdv() {
+  const o = {};
+  for (const [key, id] of Object.entries(FIELDS)) {
+    const el = $(id);
+    o[key] = el.type === "checkbox" ? el.checked : el.value.trim();
+  }
+  o.sponsor_categories = [...document.querySelectorAll("#o-cats input:checked")].map((i) => i.value);
+  return o;
+}
+
+function writeAdv(o) {
+  for (const [key, id] of Object.entries(FIELDS)) {
+    const el = $(id);
+    if (el.type === "checkbox") el.checked = !!o[key]; else el.value = o[key] ?? "";
+  }
+  document.querySelectorAll("#o-cats input").forEach((i) => { i.checked = o.sponsor_categories.includes(i.value); });
+}
+
+function isAudio() { return !!presets.find((p) => p.id === $("preset").value)?.audio; }
+
+function syncAdv() {
+  const o = readAdv();
+  const audio = isAudio();
+  const clip = !!(o.start || o.end);
+
+  $("o-items").disabled = !o.playlist;
+  $("o-precise").disabled = !clip;
+  $("fs-subs").disabled = clip;
+  $("fs-chapters").disabled = clip;
+  $("fs-sb").disabled = clip;
+  $("o-langs").disabled = $("o-auto").disabled = !o.subs;
+  $("o-submode").disabled = !o.subs || audio;
+  $("o-container").disabled = audio;
+  document.querySelectorAll("#o-cats input").forEach((i) => { i.disabled = o.sponsorblock === "off"; });
+  $("subs-hint").textContent = audio && o.subs ? "Audio downloads save subtitles as .srt files." : "";
+
+  const active = [
+    o.playlist, clip, o.subs, o.split_chapters, !o.embed_chapters, o.sponsorblock !== "off",
+    !o.embed_thumbnail, !audio && o.container !== "mp4", !!o.rate_limit,
+  ].filter(Boolean).length;
+  $("adv-count").hidden = !active;
+  $("adv-count").textContent = active;
+
+  const saved = { ...o };
+  PER_URL.forEach((k) => delete saved[k]);
+  store("adv", saved);
+}
+
+function initAdv(categories) {
+  $("o-cats").innerHTML = categories.map((c) =>
+    `<label class="check"><input type="checkbox" value="${esc(c.id)}"> ${esc(c.label)}</label>`).join("");
+  writeAdv({ ...ADV_DEFAULTS, ...(load("adv") || {}), ...Object.fromEntries(PER_URL.map((k) => [k, ADV_DEFAULTS[k]])) });
+  if (load("adv-open")) $("adv").open = true;
+  $("adv").addEventListener("toggle", () => store("adv-open", $("adv").open));
+  $("adv").addEventListener("input", syncAdv);
+  $("adv").addEventListener("change", syncAdv);
+  $("adv-reset").addEventListener("click", () => { writeAdv(ADV_DEFAULTS); syncAdv(); });
+  syncAdv();
+}
+
+function resetPerUrl() {
+  const o = readAdv();
+  PER_URL.forEach((k) => { o[k] = ADV_DEFAULTS[k]; });
+  writeAdv(o);
+  $("pl-hint").textContent = "";
+  $("ch-hint").textContent = "";
+  syncAdv();
+}
 
 async function loadPresets() {
-  const presets = await api("/api/presets");
+  const data = await api("/api/presets");
+  presets = data.presets;
   $("preset").innerHTML = presets.map((p) => `<option value="${p.id}">${esc(p.label)}</option>`).join("");
-  try { const saved = localStorage.getItem("preset"); if (saved) $("preset").value = saved; } catch {}
+  const saved = load("preset");
+  if (saved && presets.some((p) => p.id === saved)) $("preset").value = saved;
+  initAdv(data.sponsor_categories);
 }
-$("preset").addEventListener("change", () => {
-  try { localStorage.setItem("preset", $("preset").value); } catch {}
-});
+$("preset").addEventListener("change", () => { store("preset", $("preset").value); syncAdv(); });
 
-// Fetch title/thumbnail shortly after a URL is pasted or typed.
+// ---- Preview ---------------------------------------------------------------
+
 let infoTimer = null;
 $("url").addEventListener("input", () => {
   clearTimeout(infoTimer);
@@ -174,25 +394,52 @@ async function fetchInfo() {
   previewFor = url;
   preview = null;
   $("preview").classList.remove("show");
-  $("msg").textContent = "";
+  resetPerUrl();
+  showMsg("");
   if (!/^https?:\/\//i.test(url)) return;
-  $("msg").style.color = "var(--muted)";
-  $("msg").textContent = "Looking up video…";
+  showMsg("Looking up…", false);
   try {
     const info = await api("/api/info", { method: "POST", body: { url } });
     if (url !== $("url").value.trim()) return;
     preview = info;
-    $("pv-thumb").src = info.thumbnail || "";
-    $("pv-title").textContent = info.title || url;
-    $("pv-meta").textContent = [info.uploader, fmtTime(info.duration), info.max_height ? info.max_height + "p max" : ""]
-      .filter(Boolean).join(" · ");
-    $("preview").classList.add("show");
-    $("msg").textContent = "";
+    renderPreview(info);
+    showMsg("");
   } catch (e) {
     if (url !== $("url").value.trim()) return;
-    $("msg").style.color = "var(--err)";
-    $("msg").textContent = e.message;
+    showMsg(e.message);
   }
+}
+
+function renderPreview(info) {
+  $("pv-thumb").src = info.thumbnail || "";
+  $("pv-title").textContent = info.title || previewFor;
+  const chips = [];
+  if (info.kind === "playlist") {
+    $("pv-meta").textContent = [info.uploader, "Playlist"].filter(Boolean).join(" · ");
+    chips.push(`${info.playlist.count ?? "?"} videos`);
+    // A playlist link has nothing else to download, so tick the box for them.
+    $("o-playlist").checked = true;
+    $("pl-hint").textContent = `This link is a playlist (${info.playlist.count ?? "?"} videos).`;
+  } else {
+    $("pv-meta").textContent = [info.uploader, fmtTime(info.duration), info.max_height ? info.max_height + "p max" : ""]
+      .filter(Boolean).join(" · ");
+    if (info.chapters) chips.push(`${info.chapters} chapters`);
+    // YouTube sometimes appends an internal track id (en-ehkg1hFWq8A); show just the language.
+    const langs = [...new Set((info.subtitles || []).map((l) => l.replace(/-[A-Za-z0-9_]{8,}$/, "")))];
+    if (langs.length) chips.push("Subs: " + langs.slice(0, 4).join(", ") + (langs.length > 4 ? "…" : ""));
+    else if (info.auto_subtitles) chips.push("Auto-generated subs only");
+    if (info.playlist) {
+      chips.push(`In a playlist (${info.playlist.count ?? "?"})`);
+      $("pl-hint").textContent = `This video is part of "${info.playlist.title}". Tick the box to download all of it.`;
+    }
+    $("ch-hint").textContent = info.chapters ? "" : "This video has no chapters.";
+    if (info.auto_subtitles && !info.subtitles?.length) {
+      $("subs-hint").textContent = "Only auto-generated subtitles are available; tick \"Include auto-generated\".";
+    }
+  }
+  $("pv-chips").innerHTML = chips.map((c) => `<span class="chip">${esc(c)}</span>`).join("");
+  $("preview").classList.add("show");
+  syncAdv();
 }
 
 $("form").addEventListener("submit", async (ev) => {
@@ -204,38 +451,63 @@ $("form").addEventListener("submit", async (ev) => {
     const p = previewFor === url ? preview : null;
     await api("/api/jobs", {
       method: "POST",
-      body: { url, preset: $("preset").value, title: p?.title, thumbnail: p?.thumbnail },
+      body: { url, preset: $("preset").value, title: p?.title, thumbnail: p?.thumbnail, options: readAdv() },
     });
     $("url").value = "";
     previewFor = "";
     preview = null;
     $("preview").classList.remove("show");
-    $("msg").textContent = "";
+    resetPerUrl();
+    showMsg("");
     refresh();
   } catch (e) {
-    $("msg").style.color = "var(--err)";
-    $("msg").textContent = e.message;
+    showMsg(e.message);
+    $("adv").open = true;
   } finally {
     $("go").disabled = false;
   }
 });
 
+// ---- Jobs ------------------------------------------------------------------
+
+function overallPercent(j) {
+  if (j.status === "done" || j.status === "processing" && !j.item_count) return 100;
+  if (j.item_count && j.item_index) return ((j.item_index - 1) + j.percent / 100) / j.item_count * 100;
+  return j.percent;
+}
+
 function statusLine(j) {
+  const item = j.item_count ? `Item ${j.item_index || 1}/${j.item_count}` : "";
   switch (j.status) {
     case "queued": return "Queued";
     case "downloading": {
-      const parts = [`${j.percent.toFixed(1)}%`];
-      if (j.stage) parts.unshift(`Downloading ${j.stage}`);
+      const parts = [item, j.stage ? `Downloading ${j.stage}` : "", `${j.percent.toFixed(1)}%`];
       if (j.speed) parts.push(fmtBytes(j.speed) + "/s");
       if (j.eta != null) parts.push("ETA " + fmtTime(j.eta));
-      return parts.join(" · ");
+      return parts.filter(Boolean).join(" · ");
     }
-    case "processing": return "Processing" + (j.stage ? ` (${j.stage.replace(/^FFmpeg/, "")})` : "") + "…";
-    case "done": return [j.preset_label, fmtBytes(j.filesize)].filter(Boolean).join(" · ");
+    case "processing":
+      return [item, "Processing" + (j.stage ? ` (${j.stage.replace(/^FFmpeg/, "")})` : "") + "…"].filter(Boolean).join(" · ");
+    case "done": {
+      const n = j.files.length;
+      return [j.preset_label, n > 1 ? `${n} files` : "", fmtBytes(j.total_size)].filter(Boolean).join(" · ");
+    }
     case "cancelled": return "Cancelled";
     case "error": return "Failed";
   }
   return j.status;
+}
+
+function fileUrl(j, name) {
+  return `/api/jobs/${j.id}/files/` + name.split("/").map(encodeURIComponent).join("/");
+}
+
+function renderFiles(j) {
+  if (j.status !== "done" || j.files.length < 2) return "";
+  const items = j.files.map((f) =>
+    `<li><a href="${fileUrl(j, f.name)}">${esc(f.name)}</a><span class="size">${fmtBytes(f.size)}</span></li>`).join("");
+  return `<details class="files" data-files="${j.id}" ${openFileLists.has(j.id) ? "open" : ""}>
+      <summary>Show ${j.files.length} files</summary><ul>${items}</ul></details>`;
 }
 
 function renderJobs(list) {
@@ -245,23 +517,38 @@ function renderJobs(list) {
   }
   $("jobs").innerHTML = list.map((j) => {
     const active = ["queued", "downloading", "processing"].includes(j.status);
-    const width = j.status === "done" ? 100 : j.status === "processing" ? 100 : j.percent;
+    const name = j.title || j.files[0]?.name || j.url;
+    const save = j.status !== "done" ? "" : j.files.length > 1
+      ? `<a href="/api/jobs/${j.id}/zip"><button class="small primary">Save all (.zip)</button></a>`
+      : `<a href="${fileUrl(j, j.files[0].name)}"><button class="small primary">Save file</button></a>`;
+    const failed = j.item_errors?.length
+      ? `<div class="warn" title="${esc(j.item_errors.join("\n"))}">${j.item_errors.length} item(s) skipped: ${esc(j.item_errors[0])}</div>` : "";
     return `
       <div class="panel job ${j.status}">
         ${j.thumbnail ? `<img src="${esc(j.thumbnail)}" alt="">` : ""}
         <div class="body">
-          <div class="title" title="${esc(j.filename || j.title || j.url)}">${esc(j.filename || j.title || j.url)}</div>
+          <div class="title" title="${esc(name)}">${esc(name)}</div>
           <div class="meta">${esc(statusLine(j))}</div>
-          ${active || j.status === "done" ? `<div class="bar"><div style="width:${width}%"></div></div>` : ""}
+          <div class="chips">${(j.tags || []).map((t) => `<span class="chip">${esc(t)}</span>`).join("")}</div>
+          ${active || j.status === "done" ? `<div class="bar"><div style="width:${overallPercent(j)}%"></div></div>` : ""}
           ${j.error ? `<div class="error">${esc(j.error)}</div>` : ""}
+          ${failed}
           <div class="actions">
-            ${j.status === "done" ? `<a href="/api/jobs/${j.id}/file"><button class="small primary">Save file</button></a>` : ""}
+            ${save}
             ${active ? `<button class="small" data-cancel="${j.id}">Cancel</button>` : `<button class="small" data-remove="${j.id}">Remove</button>`}
           </div>
+          ${renderFiles(j)}
         </div>
       </div>`;
   }).join("");
 }
+
+// Keep file lists open across the once-a-second re-render.
+$("jobs").addEventListener("toggle", (ev) => {
+  const id = ev.target.dataset?.files;
+  if (!id) return;
+  if (ev.target.open) openFileLists.add(id); else openFileLists.delete(id);
+}, true);
 
 $("jobs").addEventListener("click", async (ev) => {
   const cancel = ev.target.closest("[data-cancel]")?.dataset.cancel;
@@ -270,8 +557,7 @@ $("jobs").addEventListener("click", async (ev) => {
     if (cancel) await api(`/api/jobs/${cancel}/cancel`, { method: "POST" });
     if (remove) await api(`/api/jobs/${remove}`, { method: "DELETE" });
   } catch (e) {
-    $("msg").style.color = "var(--err)";
-    $("msg").textContent = e.message;
+    showMsg(e.message);
   }
   if (cancel || remove) refresh();
 });
@@ -300,11 +586,12 @@ if (navigator.clipboard?.readText && window.isSecureContext) {
 }
 // Autofocus pops the keyboard on phones, so only do it with a real pointer.
 if (matchMedia("(pointer: fine)").matches) $("url").focus();
-// Accept links shared via ?url=... (handy for bookmarklets / share shortcuts).
-const shared = new URLSearchParams(location.search).get("url");
-if (shared) { $("url").value = shared; fetchInfo(); history.replaceState(null, "", location.pathname); }
 
-loadPresets();
+loadPresets().then(() => {
+  // Accept links shared via ?url=... (handy for bookmarklets / share shortcuts).
+  const shared = new URLSearchParams(location.search).get("url");
+  if (shared) { $("url").value = shared; fetchInfo(); history.replaceState(null, "", location.pathname); }
+});
 refresh();
 </script>
 </body>

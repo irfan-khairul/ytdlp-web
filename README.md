@@ -6,6 +6,17 @@ server with live progress, and can be cancelled.
 
 Presets: Best quality, 1080p, 720p, 480p (MP4, H.264 preferred), Audio MP3, Audio M4A.
 
+**Advanced options** (collapsible panel, remembered per device):
+
+- **Playlist:** whole playlist or selected items (`1-5,8`). Unavailable items are skipped and reported.
+- **Clip:** download only a start–end range, optionally with a precise (re-encoded) cut.
+- **Subtitles:** languages (`en.*,ms`), auto-generated captions, embedded or as `.srt` files.
+- **Chapters:** embed them, or split into one file per chapter.
+- **SponsorBlock:** mark sponsor/intro/outro/etc. segments as chapters, or cut them out.
+- **Other:** thumbnail embedded as cover art (on by default), MP4 or MKV, speed limit.
+
+Jobs that produce several files can be saved one at a time or all at once as a `.zip`.
+
 The release is fully self-contained. Python, the Python packages, ffmpeg and Deno (the
 JavaScript runtime yt-dlp needs for YouTube) are all bundled, so the target machine
 needs nothing installed.
