@@ -16,7 +16,7 @@ for ARCH in "${ARCHES[@]}"; do
   rm -rf "$STAGE"
   mkdir -p "$STAGE/scripts"
 
-  cp -R "$ROOT/app.py" "$ROOT/static" "$ROOT/run.sh" "$ROOT/requirements.txt" \
+  cp -R "$ROOT/app.py" "$ROOT/static" "$ROOT/run.sh" "$ROOT/requirements.txt" "$ROOT/.env.example" \
         "$ROOT/ytdlp-web.service" "$ROOT/README.md" "$STAGE/"
   cp "$ROOT/scripts/setup.sh" "$ROOT/scripts/versions.env" "$STAGE/scripts/"
   "$ROOT/scripts/setup.sh" "$ARCH" "$STAGE/runtime"

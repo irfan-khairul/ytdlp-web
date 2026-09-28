@@ -37,7 +37,9 @@ Open http://127.0.0.1:8080.
 
 ### Using it from your phone
 
-By default it only listens on localhost. To reach it from other devices on your network:
+By default it only listens on localhost. To reach it from other devices on your network,
+set `HOST=0.0.0.0` in `.env` (see [Configuration](#configuration)) and run `./run.sh`, or
+for a one-off run:
 
 ```bash
 HOST=0.0.0.0 ./run.sh
@@ -53,7 +55,16 @@ a reverse proxy with auth (e.g. Caddy/nginx basic auth, Tailscale).
 
 ## Configuration
 
-Environment variables:
+Put settings in a `.env` file next to `app.py` so a plain `./run.sh` picks them up:
+
+```bash
+cp .env.example .env    # then edit, e.g. HOST=0.0.0.0
+```
+
+`.env` is git-ignored, so `git pull` never touches it. Variables set on the command line
+(`PORT=9000 ./run.sh`) override the file.
+
+Settings:
 
 | Variable          | Default       | Meaning                                              |
 |-------------------|---------------|------------------------------------------------------|

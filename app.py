@@ -19,6 +19,26 @@ import yt_dlp
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 from yt_dlp.utils import DownloadCancelled
 
+def load_dotenv(path):
+    """Reads KEY=VALUE lines from a .env file into the environment.
+
+    Variables already set (e.g. PORT=9000 ./run.sh) win over the file.
+    """
+    if not path.is_file():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.removeprefix("export ").split("=", 1)
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        os.environ.setdefault(key.strip(), value)
+
+
+load_dotenv(Path(__file__).parent / ".env")
+
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "8080"))
 DOWNLOAD_DIR = Path(os.environ.get("DOWNLOAD_DIR", Path(__file__).parent / "downloads")).resolve()
