@@ -30,10 +30,25 @@ Alpine and other musl-based distros are not supported. Check the architecture wi
 ```bash
 tar -xzf ytdlp-web-linux-x86_64.tar.gz
 cd ytdlp-web-linux-x86_64
-./run.sh
+./run.sh start
 ```
 
 Open http://127.0.0.1:8080.
+
+### Managing the app
+
+```bash
+./run.sh start        # run in the background; keeps going after you close SSH
+./run.sh stop
+./run.sh restart      # e.g. after git pull or editing .env
+./run.sh status       # running? which URLs to open, free disk space
+./run.sh logs         # follow the log (Ctrl+C stops following, not the app)
+./run.sh check-port   # what is using the port, is it reachable, firewall hints
+./run.sh              # run in the foreground instead (Ctrl+C stops it)
+```
+
+The log is `ytdlp-web.log` in the app folder. It doesn't start again by itself after a
+reboot; run `./run.sh start`, or use the systemd service below.
 
 ### Using it from your phone
 
@@ -75,7 +90,10 @@ Settings:
 | `RETENTION_HOURS` | `24`          | Downloads are deleted this long after they were written, including ones left over from before a restart. `0` keeps them |
 | `MIN_FREE_GB`     | `5`           | Free space to keep on the download disk. New downloads are refused, and running ones stopped, below this. `0` disables |
 
-## Run as a service
+## Run as a service (optional)
+
+Only needed if you want it to start automatically on boot. Use either this or
+`./run.sh start`, not both.
 
 Put the extracted folder at `/opt/ytdlp-web`, edit `ytdlp-web.service` (set `User`,
 and `HOST` if you want LAN access), then:

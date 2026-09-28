@@ -5,3 +5,6 @@ runtime/
 dist/
 .DS_Store
 .env
+.ytdlp-web.pid
+ytdlp-web.log
+ytdlp-web.log.1
