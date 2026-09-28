@@ -25,6 +25,10 @@ DOWNLOAD_DIR = Path(os.environ.get("DOWNLOAD_DIR", Path(__file__).parent / "down
 MAX_CONCURRENT = int(os.environ.get("MAX_CONCURRENT", "2"))
 # Finished files older than this are deleted automatically. 0 disables cleanup.
 RETENTION_HOURS = float(os.environ.get("RETENTION_HOURS", "24"))
+# Keep at least this much free on the download disk: new downloads are refused
+# and running ones stopped below it. 0 disables the guard.
+MIN_FREE_GB = float(os.environ.get("MIN_FREE_GB", "5"))
+MIN_FREE_BYTES = int(MIN_FREE_GB * 1024**3)
 
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -217,6 +221,7 @@ class Job:
         self.created = time.time()
         self.finished = None
         self.cancel_requested = False
+        self.disk_full = None  # reason, when stopped by the free-space guard
 
     @property
     def dir(self):
@@ -296,9 +301,33 @@ def run_job(job):
     job.status = "downloading"
     job.dir.mkdir(parents=True, exist_ok=True)
 
+    last_disk_check = 0.0
+    finished_ids = set()  # videos that fully downloaded and post-processed
+
+    def post_hook(path):
+        m = re.search(r"\[([\w-]+)\]\.\w+$", Path(path).name)
+        if m:
+            finished_ids.add(m.group(1))
+
+    def check_disk(remaining=0):
+        """Stops the job if finishing it would eat into the free-space reserve."""
+        nonlocal last_disk_check
+        if not MIN_FREE_BYTES or time.monotonic() - last_disk_check < 2:
+            return
+        last_disk_check = time.monotonic()
+        free = free_bytes()
+        if free - remaining < MIN_FREE_BYTES:
+            need = f", this file needs {fmt_size(remaining)} more" if remaining else ""
+            job.disk_full = (f"Stopped to protect disk space: {fmt_size(free)} free{need}, "
+                             f"and at least {fmt_size(MIN_FREE_BYTES)} must stay free.")
+            raise DownloadCancelled(job.disk_full)
+
     def progress_hook(d):
         if job.cancel_requested:
             raise DownloadCancelled("Cancelled by user")
+        total = d.get("total_bytes") or d.get("total_bytes_estimate")
+        if d["status"] == "downloading":
+            check_disk(max(0, total - d.get("downloaded_bytes", 0)) if total else 0)
         info = d.get("info_dict") or {}
         if o["playlist"]:
             job.title = job.title or info.get("playlist_title") or info.get("playlist")
@@ -310,7 +339,6 @@ def run_job(job):
         if job.status == "processing":
             job.status = "downloading"  # next playlist item
         if d["status"] == "downloading":
-            total = d.get("total_bytes") or d.get("total_bytes_estimate")
             if total:
                 job.percent = min(100.0, d.get("downloaded_bytes", 0) / total * 100)
             job.speed = d.get("speed")
@@ -329,6 +357,7 @@ def run_job(job):
         if job.cancel_requested:
             raise DownloadCancelled("Cancelled by user")
         if d["status"] == "started":
+            check_disk()
             job.status = "processing"
             job.stage = d.get("postprocessor")
 
@@ -339,9 +368,12 @@ def run_job(job):
     ydl_opts.update(base_opts())
     ydl_opts.update({
         "noplaylist": not o["playlist"],
+        # Keep real file times; yt-dlp otherwise backdates them to the upload date.
+        "updatetime": False,
         "logger": JobLogger(job),
         "progress_hooks": [progress_hook],
         "postprocessor_hooks": [postprocessor_hook],
+        "post_hooks": [post_hook],
         "paths": {"home": str(job.dir)},
         "outtmpl": ydl_opts["outtmpl"] | {
             "default": name,
@@ -365,8 +397,23 @@ def run_job(job):
         job.percent = 100.0
         job.stage = None
     except DownloadCancelled:
-        job.status = "cancelled"
-        shutil.rmtree(job.dir, ignore_errors=True)
+        if job.disk_full and not job.cancel_requested:
+            # Keep playlist items that finished. Everything else (the partial
+            # download, its thumbnail, subtitles) belongs to the stopped item.
+            for p in list(job.dir.iterdir()) if job.dir.exists() else []:
+                if not any(f"[{i}]" in p.name for i in finished_ids):
+                    shutil.rmtree(p) if p.is_dir() else p.unlink()
+            job.files = collect_files(job) if job.dir.exists() else []
+            if job.files:
+                job.status = "done"
+                job.errors.insert(0, job.disk_full)
+            else:
+                job.status = "error"
+                job.error = job.disk_full
+                remove_job_files(job)
+        else:
+            job.status = "cancelled"
+            shutil.rmtree(job.dir, ignore_errors=True)
     except Exception as e:  # yt-dlp raises a variety of errors; surface them all
         if job.cancel_requested:
             job.status = "cancelled"
@@ -374,6 +421,8 @@ def run_job(job):
         else:
             job.status = "error"
             job.error = clean_error(e)
+            # A failed job has no usable output, only partial files taking up space.
+            remove_job_files(job)
     finally:
         job.finished = time.time()
         job.speed = job.eta = None
@@ -387,23 +436,74 @@ def clean_error(e):
     return msg.strip()
 
 
+def free_bytes():
+    return shutil.disk_usage(DOWNLOAD_DIR).free
+
+
+def fmt_size(n):
+    return f"{n / 1024**3:.1f} GB" if n >= 1024**3 else f"{n / 1024**2:.0f} MB"
+
+
+def disk_error():
+    """An error response when a new download would break the free-space reserve."""
+    free = free_bytes()
+    if MIN_FREE_BYTES and free < MIN_FREE_BYTES:
+        return jsonify(error=f"Not enough disk space: {fmt_size(free)} free, and at least "
+                             f"{fmt_size(MIN_FREE_BYTES)} must stay free. Remove some downloads first."), 507
+    return None
+
+
 def remove_job_files(job):
     shutil.rmtree(job.dir, ignore_errors=True)
     job.zip_path.unlink(missing_ok=True)
 
 
+def last_written(path):
+    """Newest change time of a file or anything inside a folder.
+
+    Uses ctime rather than mtime: mtime can be set to anything (yt-dlp can
+    backdate it to the upload date), but ctime always reflects the real write.
+    """
+    newest = path.stat().st_ctime
+    if path.is_dir():
+        for p in path.rglob("*"):
+            try:
+                newest = max(newest, p.stat().st_ctime)
+            except FileNotFoundError:
+                pass
+    return newest
+
+
+def cleanup_once():
+    if RETENTION_HOURS <= 0:
+        return
+    cutoff = time.time() - RETENTION_HOURS * 3600
+    with jobs_lock:
+        stale = [j for j in jobs.values() if j.finished and j.finished < cutoff]
+        for j in stale:
+            jobs.pop(j.id, None)
+        running = {j.id for j in jobs.values() if not j.finished}
+    for j in stale:
+        remove_job_files(j)
+    # Jobs are only kept in memory, so after a restart their files are no
+    # longer in the list above. Sweep the folder by age to catch those too.
+    for path in DOWNLOAD_DIR.iterdir():
+        if path.name.split(".")[0] in running:
+            continue
+        try:
+            if last_written(path) < cutoff:
+                shutil.rmtree(path) if path.is_dir() else path.unlink()
+        except FileNotFoundError:
+            pass
+
+
 def cleanup_loop():
     while True:
+        try:
+            cleanup_once()
+        except Exception as e:  # never let a cleanup hiccup kill the thread
+            print(f"cleanup failed: {e}")
         time.sleep(600)
-        if RETENTION_HOURS <= 0:
-            continue
-        cutoff = time.time() - RETENTION_HOURS * 3600
-        with jobs_lock:
-            stale = [j for j in jobs.values() if j.finished and j.finished < cutoff]
-            for j in stale:
-                jobs.pop(j.id, None)
-        for j in stale:
-            remove_job_files(j)
 
 
 def get_job(job_id):
@@ -496,6 +596,8 @@ def create_job():
         options = parse_options(data.get("options"))
     except OptionError as e:
         return jsonify(error=str(e)), 400
+    if (err := disk_error()):
+        return err
     job = Job(url, preset, options)
     job.title = data.get("title")
     job.thumbnail = data.get("thumbnail")
@@ -503,6 +605,12 @@ def create_job():
         jobs[job.id] = job
     executor.submit(run_job, job)
     return jsonify(job.to_dict()), 201
+
+
+@app.get("/api/status")
+def status():
+    usage = shutil.disk_usage(DOWNLOAD_DIR)
+    return jsonify(free=usage.free, total=usage.total, min_free=MIN_FREE_BYTES)
 
 
 @app.get("/api/jobs")
@@ -547,6 +655,10 @@ def download_zip(job_id):
     if job.status != "done" or not job.files:
         abort(404)
     if not job.zip_path.exists():
+        need = sum(f["size"] for f in job.files)
+        if MIN_FREE_BYTES and free_bytes() - need < MIN_FREE_BYTES:
+            return jsonify(error=f"Not enough disk space to build the zip ({fmt_size(need)} needed). "
+                                 "Save the files one at a time instead."), 507
         # Media is already compressed, so store rather than deflate. Build to
         # a temp name first so a concurrent request never sees half a zip.
         tmp = job.zip_path.with_suffix(f".{uuid.uuid4().hex[:6]}.tmp")

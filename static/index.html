@@ -35,6 +35,8 @@
   }
   h1 { font-size: 22px; margin: 0 0 20px; }
   h2 { font-size: 15px; margin: 32px 0 12px; color: var(--muted); font-weight: 600; }
+  #disk { font-weight: 400; }
+  #disk.low { color: var(--err); font-weight: 600; }
   .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
   form { display: flex; gap: 8px; flex-wrap: wrap; }
   .url-row { flex: 1 1 320px; min-width: 0; display: flex; gap: 8px; }
@@ -236,7 +238,7 @@
     </details>
   </div>
 
-  <h2>Downloads</h2>
+  <h2>Downloads <span id="disk"></span></h2>
   <div class="jobs" id="jobs"><div class="empty">Nothing yet.</div></div>
 </main>
 
@@ -246,6 +248,7 @@ let preview = null;       // info for the URL currently in the box
 let previewFor = "";
 let pollTimer = null;
 let presets = [];
+let disk = null;          // { free, total, min_free } from /api/status
 const openFileLists = new Set();
 
 async function api(path, opts = {}) {
@@ -519,7 +522,9 @@ function renderJobs(list) {
     const active = ["queued", "downloading", "processing"].includes(j.status);
     const name = j.title || j.files[0]?.name || j.url;
     const save = j.status !== "done" ? "" : j.files.length > 1
-      ? `<a href="/api/jobs/${j.id}/zip"><button class="small primary">Save all (.zip)</button></a>`
+      ? (zipFits(j)
+        ? `<a href="/api/jobs/${j.id}/zip"><button class="small primary">Save all (.zip)</button></a>`
+        : `<button class="small primary" disabled title="Not enough free disk space to build the zip">Save all (.zip)</button>`)
       : `<a href="${fileUrl(j, j.files[0].name)}"><button class="small primary">Save file</button></a>`;
     const failed = j.item_errors?.length
       ? `<div class="warn" title="${esc(j.item_errors.join("\n"))}">${j.item_errors.length} item(s) skipped: ${esc(j.item_errors[0])}</div>` : "";
@@ -562,11 +567,27 @@ $("jobs").addEventListener("click", async (ev) => {
   if (cancel || remove) refresh();
 });
 
+// The server builds the zip on its own disk first, so it needs that much room
+// on top of the free-space reserve.
+function zipFits(j) {
+  return !disk || !disk.min_free || disk.free - j.total_size >= disk.min_free;
+}
+
+function renderDisk() {
+  if (!disk) return;
+  const low = disk.min_free && disk.free < disk.min_free * 1.5;
+  $("disk").textContent = `· ${fmtBytes(disk.free)} free` + (low ? " (low)" : "");
+  $("disk").className = low ? "low" : "";
+  $("disk").title = disk.min_free
+    ? `New downloads stop when less than ${fmtBytes(disk.min_free)} is free.` : "";
+}
+
 async function refresh() {
   clearTimeout(pollTimer);
   let list = [];
   try {
-    list = await api("/api/jobs");
+    [list, disk] = await Promise.all([api("/api/jobs"), api("/api/status").catch(() => disk)]);
+    renderDisk();
     renderJobs(list);
   } catch {}
   const active = list.some((j) => ["queued", "downloading", "processing"].includes(j.status));

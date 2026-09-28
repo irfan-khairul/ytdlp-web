@@ -61,7 +61,8 @@ Environment variables:
 | `PORT`            | `8080`        | Port                                                 |
 | `DOWNLOAD_DIR`    | `./downloads` | Where files are stored (one subfolder per job)       |
 | `MAX_CONCURRENT`  | `2`           | Downloads running at once; the rest queue            |
-| `RETENTION_HOURS` | `24`          | Finished jobs and their files are deleted after this. `0` keeps them |
+| `RETENTION_HOURS` | `24`          | Downloads are deleted this long after they were written, including ones left over from before a restart. `0` keeps them |
+| `MIN_FREE_GB`     | `5`           | Free space to keep on the download disk. New downloads are refused, and running ones stopped, below this. `0` disables |
 
 ## Run as a service
 
@@ -120,6 +121,9 @@ On Linux you can instead run `scripts/setup.sh` once and then `./run.sh`.
 
 ## Notes
 
+- The download folder shares its disk with the rest of the system, so a full disk can break
+  other things too. `MIN_FREE_GB` guards against that, and the page shows the free space.
+  If a playlist is stopped by it, the items that already finished are kept.
 - Jobs are kept in memory, so the list clears on restart. Run a single process only (the
   bundled waitress server does this).
 - Playlist URLs download only the single video (`noplaylist`).
